@@ -4,21 +4,16 @@ from django.contrib import admin
 from rest_framework import routers
 
 from topic_modeler.views import ping_topic_modeler, TopicModelViewSet, create_test_model, create_test_topic_extraction, \
-    TopicExtractionJobViewSet, TopicWordViewSet, TopicViewSet
+    TopicExtractionJobViewSet, TopicWordViewSet, TopicViewSet, TrainDataViewSet
 
 router = routers.DefaultRouter()
 router.register(r'models', TopicModelViewSet)
 router.register(r'topics', TopicViewSet)
 router.register(r'words', TopicWordViewSet)
 router.register(r'topic_extractions', TopicExtractionJobViewSet)
+router.register(r'train_data', TrainDataViewSet)
 
 urlpatterns = [
-    # Examples:
-    # url(r'^$', 'project.views.home', name='home'),
-    # url(r'^blog/', include('blog.urls')),
-
-    # url(r'^$', index),
-    # url(r'^health$', health),
     url(r'^ping_topic_modeler', ping_topic_modeler),
     url(r'^create_test_model', create_test_model),
     url(r'^create_test_topic_extraction', create_test_topic_extraction),

@@ -4,9 +4,14 @@ from datetime import datetime
 from django.http import HttpResponse
 from rest_framework import viewsets
 
-from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord
+from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData
 from topic_modeler.serializers import TopicModelSerializer, TopicSerializer, TopicWordSerializer, \
-    TopicExtractionJobSerializer
+    TopicExtractionJobSerializer, TrainDataSerializer
+
+
+class TrainDataViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = TrainData.objects.all().order_by('-id')
+    serializer_class = TrainDataSerializer
 
 
 class TopicModelViewSet(viewsets.ReadOnlyModelViewSet):
@@ -46,14 +51,14 @@ def create_test_model(request):
     t.model = m
     t.created_date = datetime.now()
     t.inuse = False
-    t.topic = 'test topic 1'
+    t.topic = 'test topic'
     t.save()
     t.refresh_from_db()
     # word
     w = TopicWord()
     w.topic = t
     w.created_date = datetime.now()
-    w.word = 'test word 1'
+    w.word = 'test word'
     w.inuse = False
     w.save()
     # done

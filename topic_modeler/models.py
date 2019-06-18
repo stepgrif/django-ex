@@ -1,9 +1,15 @@
 from django.db import models
 
 
+# training data
+class TrainData(models.Model):
+    created_date = models.DateTimeField(auto_now_add=True)
+    text = models.TextField()
+
+
 # the root
 class TopicModel(models.Model):
-    created_date = models.DateTimeField()
+    created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(default=None, blank=True, null=True)
     perplexity = models.FloatField(default=None, blank=True, null=True)
     decomposition = models.CharField(max_length=250, default=None, blank=True, null=True)
@@ -15,7 +21,7 @@ class TopicModel(models.Model):
 # topics of the model
 class Topic(models.Model):
     model = models.ForeignKey(TopicModel, on_delete=models.CASCADE)
-    created_date = models.DateTimeField()
+    created_date = models.DateTimeField(auto_now_add=True)
     topic = models.CharField(max_length=50)
     inuse = models.BooleanField()
 
@@ -23,7 +29,7 @@ class Topic(models.Model):
 # words of the topics
 class TopicWord(models.Model):
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE)
-    created_date = models.DateTimeField()
+    created_date = models.DateTimeField(auto_now_add=True)
     word = models.CharField(max_length=50)
     inuse = models.BooleanField()
 
@@ -31,7 +37,7 @@ class TopicWord(models.Model):
 # topic extraction job
 class TopicExtractionJob(models.Model):
     model = models.ForeignKey(TopicModel, on_delete=models.CASCADE)
-    created_date = models.DateTimeField()
+    created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(default=None, blank=True, null=True)
     reference = models.CharField(max_length=250)
     processed = models.BooleanField()
