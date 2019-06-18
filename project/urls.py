@@ -2,20 +2,22 @@ from django.conf import settings
 from django.conf.urls import include, url
 from django.contrib import admin
 
-#from welcome.views import index, health
+from topic_modeler.views import topic_modeler_ping
 
 urlpatterns = [
     # Examples:
     # url(r'^$', 'project.views.home', name='home'),
     # url(r'^blog/', include('blog.urls')),
 
-    #url(r'^$', index),
-    #url(r'^health$', health),
+    # url(r'^$', index),
+    # url(r'^health$', health),
+    url(r'^topic_modeler_ping', topic_modeler_ping),
     url(r'^admin/', include(admin.site.urls)),
 ]
 
 if settings.DEBUG:
     import debug_toolbar
+
     urlpatterns = [
-        url(r'^__debug__/', include(debug_toolbar.urls)),
-    ] + urlpatterns
+                      url(r'^__debug__/', include(debug_toolbar.urls)),
+                  ] + urlpatterns
