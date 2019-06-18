@@ -4,26 +4,26 @@ from django.conf import settings
 
 
 engines = {
-    'sqlite': 'django.db.backends.sqlite3',
-    'postgresql': 'django.db.backends.postgresql_psycopg2',
-    'mysql': 'django.db.backends.mysql',
+    'SQLITE': 'django.db.backends.sqlite3',
+    'POSTGRESQL': 'django.db.backends.postgresql_psycopg2'
 }
 
 
 def config():
-    service_name = os.getenv('DATABASE_SERVICE_NAME', '').upper().replace('-', '_')
-    if service_name:
-        engine = engines.get(os.getenv('DATABASE_ENGINE'), engines['sqlite'])
-    else:
-        engine = engines['sqlite']
-    name = os.getenv('DATABASE_NAME')
-    if not name and engine == engines['sqlite']:
+    # is engine is set, default sqlite
+    engine = engines.get(os.getenv('DB_ENGINE').upper(), engines['SQLITE'])
+    # schema name
+    name = os.getenv('DB_NAME')
+    # is schema name set
+    if name is None:
+        # sqlite is default
         name = os.path.join(settings.BASE_DIR, 'db.sqlite3')
+    # map of values
     return {
         'ENGINE': engine,
         'NAME': name,
-        'USER': os.getenv('DATABASE_USER'),
-        'PASSWORD': os.getenv('DATABASE_PASSWORD'),
-        'HOST': os.getenv('{}_SERVICE_HOST'.format(service_name)),
-        'PORT': os.getenv('{}_SERVICE_PORT'.format(service_name)),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
     }
