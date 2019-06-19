@@ -1,6 +1,21 @@
 from django.db import models
 
 
+# tasks
+class RunningTasks(models.Model):
+    created_date = models.DateTimeField(auto_now_add=True)
+    updated_date = models.DateTimeField(auto_now=True)
+    name = models.CharField(max_length=250)
+    active = models.BooleanField()
+    running = models.BooleanField()
+
+
+# unprocessed training data
+class DataRaw(models.Model):
+    created_date = models.DateTimeField(auto_now_add=True)
+    text = models.TextField()
+
+
 # training data
 class TrainData(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
@@ -10,7 +25,7 @@ class TrainData(models.Model):
 # the root
 class TopicModel(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
-    updated_date = models.DateTimeField(default=None, blank=True, null=True)
+    updated_date = models.DateTimeField(auto_now=True)
     perplexity = models.FloatField(default=None, blank=True, null=True)
     decomposition = models.CharField(max_length=250, default=None, blank=True, null=True)
     features_extraction = models.CharField(max_length=250, default=None, blank=True, null=True)
@@ -38,7 +53,7 @@ class TopicWord(models.Model):
 class TopicExtractionJob(models.Model):
     model = models.ForeignKey(TopicModel, on_delete=models.CASCADE)
     created_date = models.DateTimeField(auto_now_add=True)
-    updated_date = models.DateTimeField(default=None, blank=True, null=True)
+    updated_date = models.DateTimeField(auto_now=True)
     reference = models.CharField(max_length=250)
     processed = models.BooleanField()
     text = models.TextField()

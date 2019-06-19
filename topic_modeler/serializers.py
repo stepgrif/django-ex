@@ -1,6 +1,12 @@
 from rest_framework import serializers
 
-from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData
+from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData, DataRaw
+
+
+class DataRawSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = DataRaw
+        fields = ('created_date', 'text')
 
 
 class TrainDataSerializer(serializers.HyperlinkedModelSerializer):

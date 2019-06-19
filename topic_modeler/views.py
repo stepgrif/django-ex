@@ -4,9 +4,14 @@ from datetime import datetime
 from django.http import HttpResponse
 from rest_framework import viewsets
 
-from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData
+from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData, DataRaw
 from topic_modeler.serializers import TopicModelSerializer, TopicSerializer, TopicWordSerializer, \
-    TopicExtractionJobSerializer, TrainDataSerializer
+    TopicExtractionJobSerializer, TrainDataSerializer, DataRawSerializer
+
+
+class DataRawViewSet(viewsets.ModelViewSet):
+    queryset = DataRaw.objects.all().order_by('-id')
+    serializer_class = DataRawSerializer
 
 
 class TrainDataViewSet(viewsets.ReadOnlyModelViewSet):
@@ -37,7 +42,6 @@ class TopicExtractionJobViewSet(viewsets.ReadOnlyModelViewSet):
 def create_test_model(request):
     # model
     m = TopicModel()
-    m.created_date = datetime.now()
     m.updated_date = datetime.now()
     m.perplexity = 0.0
     m.decomposition = 'LatentDirichletAllocation'
@@ -49,7 +53,6 @@ def create_test_model(request):
     # topic
     t = Topic()
     t.model = m
-    t.created_date = datetime.now()
     t.inuse = False
     t.topic = 'test topic'
     t.save()
@@ -67,12 +70,10 @@ def create_test_model(request):
 
 def create_test_topic_extraction(request):
     text_param = request.GET['text']
-    model_id = request.GET['model_id']
-    model_from_db = TopicModel.objects.get(id=model_id)
+    model_from_db = TopicModel.objects.filter().order_by('id').first()
     if model_from_db and text_param:
         t = TopicExtractionJob()
         t.model = model_from_db
-        t.created_date = datetime.now()
         t.updated_date = datetime.now()
         t.reference = str(uuid.uuid1())
         t.processed = False
