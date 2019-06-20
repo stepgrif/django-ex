@@ -4,7 +4,7 @@ from django.contrib import admin
 from rest_framework import routers
 
 from topic_modeler.views import ping_topic_modeler, TopicModelViewSet, TopicExtractionJobViewSet, TopicWordViewSet, \
-    TopicViewSet, TrainDataViewSet, DataRawViewSet, RunningTasksViewSet, create_test_model
+    TopicViewSet, TrainDataViewSet, DataRawViewSet, RunningTasksViewSet, create_test_model, health, index
 
 router = routers.DefaultRouter()
 router.register(r'models', TopicModelViewSet)
@@ -16,6 +16,10 @@ router.register(r'data_raw', DataRawViewSet)
 router.register(r'running_tasks', RunningTasksViewSet)
 
 urlpatterns = [
+    #
+    url(r'^$', index),
+    url(r'^health$', health),
+
     # for testing
     url(r'^ping_topic_modeler', ping_topic_modeler),
     url(r'^create_test_model', create_test_model),

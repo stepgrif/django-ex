@@ -45,6 +45,14 @@ def ping_topic_modeler(request):
     return HttpResponse('Topic modeler application online')
 
 
+def health(request):
+    return HttpResponse('All is OK')
+
+
+def index(request):
+    return HttpResponse('All is OK')
+
+
 def create_test_model(request):
     # model
     m = TopicModel()
