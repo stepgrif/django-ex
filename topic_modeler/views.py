@@ -1,12 +1,15 @@
-import uuid
-from datetime import datetime
-
 from django.http import HttpResponse
 from rest_framework import viewsets
 
-from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData, DataRaw
+from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData, DataRaw, RunningTasks
 from topic_modeler.serializers import TopicModelSerializer, TopicSerializer, TopicWordSerializer, \
-    TopicExtractionJobSerializer, TrainDataSerializer, DataRawSerializer
+    TopicExtractionJobSerializer, TrainDataSerializer, DataRawSerializer, RunningTasksSerializer
+from topic_modeler.topic_modeler import schedule_train_topic_model
+
+
+class RunningTasksViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = RunningTasks.objects.all().order_by('-id')
+    serializer_class = RunningTasksSerializer
 
 
 class DataRawViewSet(viewsets.ModelViewSet):
@@ -39,47 +42,18 @@ class TopicExtractionJobViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TopicExtractionJobSerializer
 
 
-def create_test_model(request):
-    # model
-    m = TopicModel()
-    m.updated_date = datetime.now()
-    m.perplexity = 0.0
-    m.decomposition = 'LatentDirichletAllocation'
-    m.features_extraction = 'CountVectorizer'
-    m.inuse = False
-    m.fitted_model = bytearray('test_insert_model', 'utf-8')
-    m.save()
-    m.refresh_from_db()
-    # topic
-    t = Topic()
-    t.model = m
-    t.inuse = False
-    t.topic = 'test topic'
-    t.save()
-    t.refresh_from_db()
-    # word
-    w = TopicWord()
-    w.topic = t
-    w.created_date = datetime.now()
-    w.word = 'test word'
-    w.inuse = False
-    w.save()
+def train_model(request):
+    # extract parameters
+    number_of_topics = request.GET['number_of_topics']
+    words_per_topic = request.GET['words_per_topic']
+    # schedule job
+    message = schedule_train_topic_model(number_of_topics, words_per_topic)
     # done
-    return HttpResponse('Created test model, test topic with a word')
+    return HttpResponse(message)
 
 
-def create_test_topic_extraction(request):
-    text_param = request.GET['text']
-    model_from_db = TopicModel.objects.filter().order_by('id').first()
-    if model_from_db and text_param:
-        t = TopicExtractionJob()
-        t.model = model_from_db
-        t.updated_date = datetime.now()
-        t.reference = str(uuid.uuid1())
-        t.processed = False
-        t.text = text_param
-        t.save()
-    return HttpResponse('Created test model')
+def extract_topic(request):
+    pass
 
 
 def ping_topic_modeler(request):
