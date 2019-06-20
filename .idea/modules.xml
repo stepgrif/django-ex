@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/DafmTopicModeling.iml" filepath="$PROJECT_DIR$/.idea/DafmTopicModeling.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/dafm_topic_modeler.iml" filepath="$PROJECT_DIR$/.idea/dafm_topic_modeler.iml" />
     </modules>
   </component>
 </project>
