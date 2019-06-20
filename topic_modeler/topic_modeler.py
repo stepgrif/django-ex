@@ -1,4 +1,5 @@
 import logging
+import os
 import pickle
 import re
 from datetime import datetime
@@ -90,10 +91,12 @@ def process_topics_words(model_new):
 
 # does model training
 def train_store_model(number_of_topics, data):
+    # number of jobs
+    jobs_num = os.getenv('LDA_JOBS') if os.getenv('LDA_JOBS') else 1
     # paralell train
-    with parallel_backend('threading', n_jobs=-1):
+    with parallel_backend('threading', n_jobs=jobs_num):
         # LDA train BoW
-        lda_vec = LatentDirichletAllocation(n_components=number_of_topics, learning_method='online', n_jobs=-1)
+        lda_vec = LatentDirichletAllocation(n_components=number_of_topics, learning_method='online', n_jobs=jobs_num)
         # train
         lda_vec_trained = lda_vec.fit_transform(data)
         # mark other as not use
@@ -108,8 +111,9 @@ def train_store_model(number_of_topics, data):
         model_new.inuse = True
         model_new.fitted_model.value = pickle.dumps(lda_vec_trained)
         model_new.save()
-        # done
+        # reload for an id
         model_new.refresh_from_db()
+        # done
         return model_new
 
 
@@ -132,8 +136,8 @@ def process_raw_data():
         # remove processed row
         rd.delete()
     # get all old train data
-    # for td  in TrainData.objects.all():
-    #     data_clean.append(td.text)
+    for td in TrainData.objects.all():
+        data_clean.append(td.text)
     # done
     return data_clean
 
