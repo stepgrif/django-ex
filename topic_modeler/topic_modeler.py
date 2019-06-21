@@ -27,7 +27,7 @@ nltk.download('stopwords', quiet=True)
 STOPWORDS = set(stopwords.words('english'))
 
 # Initialize spacy en model
-NLP = spacy.load('en')
+NLP = spacy.load('en_core_web_sm')
 
 # keeping only Noun, Adj, Verb, Adverb
 ALLOWED_POSTAGS = ['NOUN', 'ADJ', 'VERB', 'ADV']
