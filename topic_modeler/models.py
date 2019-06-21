@@ -1,7 +1,9 @@
 from django.db import models
 
-
 # tasks
+from picklefield import PickledObjectField
+
+
 class RunningTasks(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)
@@ -29,7 +31,8 @@ class TopicModel(models.Model):
     decomposition = models.CharField(max_length=250, default=None, blank=True, null=True)
     features_extraction = models.CharField(max_length=250, default=None, blank=True, null=True)
     inuse = models.BooleanField()
-    fitted_model = models.BinaryField(default=None, blank=True, null=True)
+    model = PickledObjectField()
+    fitted_model = PickledObjectField()
 
 
 # topics of the model

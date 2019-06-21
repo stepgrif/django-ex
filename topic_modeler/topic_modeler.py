@@ -1,10 +1,11 @@
 import logging
 import os
-import pickle
 import re
+import uuid
 from datetime import datetime
 
 import gensim
+import numpy as np
 import spacy
 from apscheduler.schedulers.background import BackgroundScheduler
 from joblib import parallel_backend
@@ -13,7 +14,7 @@ from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer
 
 from topic_modeler import TRAIN_TASK
-from topic_modeler.models import RunningTasks, DataRaw, TrainData, TopicModel
+from topic_modeler.models import RunningTasks, DataRaw, TrainData, TopicModel, Topic, TopicWord
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,6 @@ def extract_topic():
 # does model training
 def train_topic_model(number_of_topics, words_per_topic):
     try:
-        logger.debug(f'Train model with number_of_topics:{number_of_topics}, words_per_topic:{words_per_topic}')
         # do the raw data
         clean_data = process_raw_data()
         # do the features
@@ -77,7 +77,7 @@ def train_topic_model(number_of_topics, words_per_topic):
         # do the train
         model_new = train_store_model(number_of_topics, clean_lemma_data_vect)
         # do the topics and words
-        process_topics_words(model_new, clean_lemma_data_vect_features)
+        process_topics_words(model_new, clean_lemma_data_vect_features, words_per_topic)
     except Exception as e:
         logger.debug(e)
     finally:
@@ -86,9 +86,41 @@ def train_topic_model(number_of_topics, words_per_topic):
 
 
 # does topics and words
-def process_topics_words(model_new):
-    pass
-
+def process_topics_words(model_new, features, words_count):
+    # convert to numpy array
+    keywords = np.array(features)
+    # da keywords
+    topic_keywords = []
+    # iterate
+    for topic_weights in model_new.model.components_:
+        # find the best
+        top_keyword_locs = (-topic_weights).argsort()[:int(words_count)]
+        # store
+        topic_keywords.append(keywords.take(top_keyword_locs))
+    # deactivate all other topics
+    for t in Topic.objects.filter(inuse=True):
+        t.inuse = False
+        t.save()
+    # deactivate all words
+    for t in TopicWord.objects.filter(inuse=True):
+        t.inuse = False
+        t.save()
+    # store in db
+    for kw in topic_keywords:
+        # topic
+        t = Topic()
+        t.model = model_new
+        t.inuse = True
+        t.topic = uuid.uuid1()
+        t.save()
+        t.refresh_from_db()
+        # words
+        for wrd in kw:
+            w = TopicWord()
+            w.topic = t
+            w.inuse = True
+            w.word = wrd
+            w.save()
 
 # does model training
 def train_store_model(number_of_topics, data):
@@ -111,7 +143,8 @@ def train_store_model(number_of_topics, data):
         model_new.decomposition = 'LatentDirichletAllocation'
         model_new.features_extraction = 'CountVectorizer'
         model_new.inuse = True
-        model_new.fitted_model = pickle.dumps(lda_vec_trained)
+        model_new.model = lda_vec
+        model_new.fitted_model = lda_vec_trained
         model_new.save()
         # reload for an id
         model_new.refresh_from_db()
