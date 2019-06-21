@@ -4,7 +4,7 @@ from rest_framework import viewsets
 from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData, DataRaw, RunningTasks
 from topic_modeler.serializers import TopicModelSerializer, TopicSerializer, TopicWordSerializer, \
     TopicExtractionJobSerializer, TrainDataSerializer, DataRawSerializer, RunningTasksSerializer
-from topic_modeler.topic_modeler import schedule_train_topic_model
+from topic_modeler.topic_modeler import schedule_train_topic_model, do_topic_extraction
 
 
 class RunningTasksViewSet(viewsets.ReadOnlyModelViewSet):
@@ -53,7 +53,12 @@ def train_model(request):
 
 
 def extract_topic(request):
-    pass
+    # extract parameters
+    text = request.GET['text']
+    # schedule job
+    message = do_topic_extraction(text)
+    # done
+    return HttpResponse(message)
 
 
 def health(request):

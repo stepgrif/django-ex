@@ -14,7 +14,7 @@ from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer
 
 from topic_modeler import TRAIN_TASK
-from topic_modeler.models import RunningTasks, DataRaw, TrainData, TopicModel, Topic, TopicWord
+from topic_modeler.models import RunningTasks, DataRaw, TrainData, TopicModel, Topic, TopicWord, TopicExtractionJob
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,46 @@ def schedule_train_topic_model(number_of_topics, words_per_topic):
         process_task(False)
 
 
-def extract_topic():
-    pass
+def do_topic_extraction(text):
+    model = TopicModel.objects.filter(inuse=True).first()
+    if model:
+        if len(text) > 0:
+            # clean data
+            cd = basic_clean(text)
+            # lemma
+            cd_w = list(sent_to_words([cd]))
+            # lemma
+            clean_data = lemma_clean(cd_w)
+            # extract sparse matrix
+            vectoriser = model.features_extraction
+            # extact features
+            clean_data_vec = vectoriser.transform(clean_data)
+            # labels generated
+            clean_data_vec_features = vectoriser.get_feature_names()
+            # model
+            vec_scores = model.model.transform(clean_data_vec)
+            # keywords
+            keywords = extract_keywords(clean_data_vec_features, model, 10)
+            # extract topic
+            topic_words = []
+            for i, x in enumerate(vec_scores):
+                topic_words.append(keywords[int(np.argmax(x))])
+            # store it
+            te = TopicExtractionJob()
+            te.model = model
+            te.text = text
+            te.reference = uuid.uuid1()
+            te.processed = True
+            te.save()
+            # store train data
+            train_data = TrainData()
+            train_data.text = clean_data
+            train_data.save()
+            # done
+            return ' '.join([str(x) for x in topic_words[0][:model.model.components_.shape[0]]])
+
+        return 'Text is empty'
+    return 'Please train model'
 
 
 # does model training
@@ -73,9 +111,9 @@ def train_topic_model(number_of_topics, words_per_topic):
         # do the raw data
         clean_data = process_raw_data()
         # do the features
-        clean_lemma_data_vect, clean_lemma_data_vect_features = extract_features(clean_data)
+        clean_lemma_data_vect, clean_lemma_data_vect_features, vectoriser = extract_features(clean_data)
         # do the train
-        model_new = train_store_model(number_of_topics, clean_lemma_data_vect)
+        model_new = train_store_model(number_of_topics, clean_lemma_data_vect, vectoriser)
         # do the topics and words
         process_topics_words(model_new, clean_lemma_data_vect_features, words_per_topic)
     except Exception as e:
@@ -122,8 +160,9 @@ def process_topics_words(model_new, features, words_count):
             w.word = wrd
             w.save()
 
+
 # does model training
-def train_store_model(number_of_topics, data):
+def train_store_model(number_of_topics, data, vectoriser):
     # number of jobs
     jobs_num = os.getenv('LDA_JOBS') if os.getenv('LDA_JOBS') else 1
     # paralell train
@@ -140,8 +179,8 @@ def train_store_model(number_of_topics, data):
         # store new one
         model_new = TopicModel()
         model_new.perplexity = lda_vec.perplexity(data)
-        model_new.decomposition = 'LatentDirichletAllocation'
-        model_new.features_extraction = 'CountVectorizer'
+        model_new.decomposition = lda_vec
+        model_new.features_extraction = vectoriser
         model_new.inuse = True
         model_new.model = lda_vec
         model_new.fitted_model = lda_vec_trained
@@ -159,7 +198,7 @@ def process_raw_data():
     # get all new raw data
     for rd in DataRaw.objects.all():
         # stop words
-        cd = basic_clean(rd)
+        cd = basic_clean(rd.text)
         # store
         data_clean.append(cd)
     # split words
@@ -192,7 +231,7 @@ def extract_features(clean_lemma_data):
         # labels generated
         clean_lemma_data_vect_features = vectorised.get_feature_names()
         # done
-        return clean_lemma_data_vect, clean_lemma_data_vect_features
+        return clean_lemma_data_vect, clean_lemma_data_vect_features, vectorised
 
 
 # does updating train task running state
@@ -208,7 +247,7 @@ def process_task(running):
 # does basic clean
 def basic_clean(data):
     # lower case
-    text = str.lower(data.text)
+    text = str.lower(data)
     # remove bad symbols
     text = BAD_SYMBOLS_RE.sub(' ', text)
     # remove stop words and words with length < 2
@@ -236,3 +275,19 @@ def lemma_clean(data):
 def sent_to_words(sentences):
     for sentence in sentences:
         yield (gensim.utils.simple_preprocess(str(sentence), deacc=True))
+
+
+# extract keywords
+def extract_keywords(features, model, words_count):
+    # convert to numpy array
+    keywords = np.array(features)
+    # da keywords
+    topic_keywords = []
+    # iterate
+    for topic_weights in model.model.components_:
+        # find the best
+        top_keyword_locs = (-topic_weights).argsort()[:int(words_count)]
+        # store
+        topic_keywords.append(keywords.take(top_keyword_locs))
+    # done
+    return topic_keywords
