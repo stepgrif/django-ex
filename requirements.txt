@@ -11,7 +11,7 @@ nltk==3.4.3
 django-picklefield==2.0
 gensim==3.7.3
 numpy==1.16.4
-scikit-learn=0.21.2
+scikit-learn==0.21.2
 joblib==0.13.2
 APScheduler==3.6.0
 
