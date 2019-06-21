@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 import gensim
+import nltk
 import numpy as np
 import spacy
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 BAD_SYMBOLS_RE = re.compile(r'\W|\d|\.|x{2,}|,|\'')
 
 # define stop words
+nltk.download('stopwords', quiet=True)
 STOPWORDS = set(stopwords.words('english'))
 
 # Initialize spacy en model
