@@ -4,6 +4,7 @@ import pickle
 import re
 from datetime import datetime
 
+import gensim
 import spacy
 from apscheduler.schedulers.background import BackgroundScheduler
 from joblib import parallel_backend
@@ -76,7 +77,7 @@ def train_topic_model(number_of_topics, words_per_topic):
         # do the train
         model_new = train_store_model(number_of_topics, clean_lemma_data_vect)
         # do the topics and words
-        process_topics_words(model_new)
+        process_topics_words(model_new, clean_lemma_data_vect_features)
     except Exception as e:
         logger.debug(e)
     finally:
@@ -96,7 +97,8 @@ def train_store_model(number_of_topics, data):
     # paralell train
     with parallel_backend('threading', n_jobs=jobs_num):
         # LDA train BoW
-        lda_vec = LatentDirichletAllocation(n_components=number_of_topics, learning_method='online', n_jobs=jobs_num)
+        lda_vec = LatentDirichletAllocation(n_components=int(number_of_topics), learning_method='online',
+                                            n_jobs=jobs_num)
         # train
         lda_vec_trained = lda_vec.fit_transform(data)
         # mark other as not use
@@ -109,7 +111,7 @@ def train_store_model(number_of_topics, data):
         model_new.decomposition = 'LatentDirichletAllocation'
         model_new.features_extraction = 'CountVectorizer'
         model_new.inuse = True
-        model_new.fitted_model.value = pickle.dumps(lda_vec_trained)
+        model_new.fitted_model = pickle.dumps(lda_vec_trained)
         model_new.save()
         # reload for an id
         model_new.refresh_from_db()
@@ -125,21 +127,26 @@ def process_raw_data():
     for rd in DataRaw.objects.all():
         # stop words
         cd = basic_clean(rd)
-        # lemma
-        clean_data = lemma_clean(cd)
-        # store as clean
+        # store
+        data_clean.append(cd)
+    # split words
+    cd_w = list(sent_to_words(data_clean))
+    # lemma
+    clean_data = lemma_clean(cd_w)
+    # store as clean
+    for s in clean_data:
         train_data = TrainData()
-        train_data.text = clean_data
+        train_data.text = s
         train_data.save()
-        # add
-        data_clean.append(clean_data)
-        # remove processed row
-        rd.delete()
+    # remove all process data
+    DataRaw.objects.all().delete()
+    # all clean data
+    all_clean = []
     # get all old train data
     for td in TrainData.objects.all():
-        data_clean.append(td.text)
+        all_clean.append(td.text)
     # done
-    return data_clean
+    return all_clean
 
 
 # does feature extraction
@@ -179,10 +186,20 @@ def basic_clean(data):
 
 # does lemma
 def lemma_clean(data):
-    # create document
-    doc = NLP(data)
-    # retail only what allowed, Noun, Adj, Verb, Adverb
-    result = " ".join(
-        [token.lemma_ if token.lemma_ not in ['-PRON-'] else '' for token in doc if token.pos_ in ALLOWED_POSTAGS])
+    # what goes out
+    texts_out = []
+    # iterate
+    for sent in data:
+        # doc
+        doc = NLP(" ".join(sent))
+        # process
+        texts_out.append(" ".join(
+            [token.lemma_ if token.lemma_ not in ['-PRON-'] else '' for token in doc if token.pos_ in ALLOWED_POSTAGS]))
     # done
-    return result
+    return texts_out
+
+
+# tokenize each sentence into a list of words
+def sent_to_words(sentences):
+    for sentence in sentences:
+        yield (gensim.utils.simple_preprocess(str(sentence), deacc=True))
