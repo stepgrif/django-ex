@@ -6,7 +6,6 @@ import uuid
 from datetime import datetime
 
 import gensim
-import nltk
 import numpy as np
 import spacy
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -24,11 +23,7 @@ logger = logging.getLogger(__name__)
 BAD_SYMBOLS_RE = re.compile(r'\W|\d|\.|x{2,}|,|\'')
 
 # define stop words
-nltk.download('stopwords', quiet=True)
 STOPWORDS = set(stopwords.words('english'))
-
-# Initialize spacy en model
-NLP = spacy.load('en_core_web_sm')
 
 # keeping only Noun, Adj, Verb, Adverb
 ALLOWED_POSTAGS = ['NOUN', 'ADJ', 'VERB', 'ADV']
@@ -281,6 +276,8 @@ def basic_clean(data):
 
 # does lemma
 def lemma_clean(data):
+    # Initialize spacy en model
+    NLP = spacy.load('en_core_web_sm')
     # what goes out
     texts_out = []
     # iterate
