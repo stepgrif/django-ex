@@ -66,45 +66,52 @@ def schedule_train_topic_model(number_of_topics, words_per_topic):
 
 
 def do_topic_extraction(text):
-    model = TopicModel.objects.filter(inuse=True).first()
-    if model:
-        if len(text) > 0:
-            # clean data
-            cd = basic_clean(text)
-            # lemma
-            cd_w = list(sent_to_words([cd]))
-            # lemma
-            clean_data = lemma_clean(cd_w)
-            # extract sparse matrix
-            vectoriser = model.features_extraction
-            # extact features
-            clean_data_vec = vectoriser.transform(clean_data)
-            # labels generated
-            clean_data_vec_features = vectoriser.get_feature_names()
-            # model
-            vec_scores = model.model.transform(clean_data_vec)
-            # keywords
-            keywords = extract_keywords(clean_data_vec_features, model, 10)
-            # extract topic
-            topic_words = []
-            for i, x in enumerate(vec_scores):
-                topic_words.append(keywords[int(np.argmax(x))])
-            # store it
-            te = TopicExtractionJob()
-            te.model = model
-            te.text = text
-            te.reference = uuid.uuid1()
-            te.processed = True
-            te.save()
-            # store train data
-            train_data = TrainData()
-            train_data.text = clean_data
-            train_data.save()
-            # done
-            return ' '.join([str(x) for x in topic_words[0][:model.model.components_.shape[0]]])
-
-        return 'Text is empty'
-    return 'Please train model'
+    try:
+        model = TopicModel.objects.filter(inuse=True).first()
+        if model:
+            if len(text) > 0:
+                # clean data
+                cd = basic_clean(text)
+                # lemma
+                cd_w = list(sent_to_words([cd]))
+                # lemma
+                clean_data = lemma_clean(cd_w)
+                # extract sparse matrix
+                vectoriser = model.features_extraction
+                # extact features
+                clean_data_vec = vectoriser.transform(clean_data)
+                # labels generated
+                clean_data_vec_features = vectoriser.get_feature_names()
+                # model
+                vec_scores = model.model.transform(clean_data_vec)
+                # keywords
+                keywords = extract_keywords(clean_data_vec_features, model, 10)
+                # extract topic
+                topic_words = []
+                for i, x in enumerate(vec_scores):
+                    topic_words.append(keywords[int(np.argmax(x))])
+                # store it
+                te = TopicExtractionJob()
+                te.model = model
+                te.text = text
+                te.reference = uuid.uuid1()
+                te.processed = True
+                te.save()
+                # store train data
+                train_data = TrainData()
+                train_data.text = clean_data
+                train_data.save()
+                # done
+                return ' '.join([str(x) for x in topic_words[0][:model.model.components_.shape[0]]])
+            # no text
+            logger.debug('No te')
+            return 'Text is empty'
+        # no model
+        logger.debug('Model  not trained')
+        return 'Please train model'
+    except Exception as e:
+        logger.debug(e)
+        return f'Exception occur:{str(e)}'
 
 
 # does model training
@@ -167,7 +174,7 @@ def process_topics_words(model_new, features, words_count):
 def train_store_model(number_of_topics, data, vectoriser):
     # number of jobs
     jobs_num = os.getenv('LDA_JOBS') if os.getenv('LDA_JOBS') else 1
-    # paralell train
+    # parallel train
     with parallel_backend('threading', n_jobs=jobs_num):
         # LDA train BoW
         lda_vec = LatentDirichletAllocation(n_components=int(number_of_topics), learning_method='online',

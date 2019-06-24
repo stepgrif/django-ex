@@ -1,7 +1,10 @@
+import os
+
 from django.http import HttpResponse
 from rest_framework import viewsets
 
-from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData, DataRaw, RunningTasks
+from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData, DataRaw, RunningTasks, \
+    PageView
 from topic_modeler.serializers import TopicModelSerializer, TopicSerializer, TopicWordSerializer, \
     TopicExtractionJobSerializer, TrainDataSerializer, DataRawSerializer, RunningTasksSerializer
 from topic_modeler.topic_modeler import schedule_train_topic_model, do_topic_extraction
@@ -61,9 +64,11 @@ def extract_topic(request):
     return HttpResponse(message)
 
 
-def health(request):
-    return HttpResponse('Health is OK')
-
-
 def index(request):
-    return HttpResponse('Index is OK')
+    hostname = os.getenv('HOSTNAME', 'unknown')
+    PageView.objects.create(hostname=hostname)
+    return HttpResponse(PageView.objects.count())
+
+
+def health(request):
+    return HttpResponse(PageView.objects.count())
