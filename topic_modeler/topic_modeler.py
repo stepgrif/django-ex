@@ -22,9 +22,6 @@ logger = logging.getLogger(__name__)
 # define bad symbols
 BAD_SYMBOLS_RE = re.compile(r'\W|\d|\.|x{2,}|,|\'')
 
-# define stop words
-STOPWORDS = set(stopwords.words('english'))
-
 # keeping only Noun, Adj, Verb, Adverb
 ALLOWED_POSTAGS = ['NOUN', 'ADJ', 'VERB', 'ADV']
 
@@ -264,6 +261,8 @@ def process_task(running):
 
 # does basic clean
 def basic_clean(data):
+    # define stop words TODO
+    STOPWORDS = set(stopwords.words('english'))
     # lower case
     text = str.lower(data)
     # remove bad symbols
@@ -276,7 +275,7 @@ def basic_clean(data):
 
 # does lemma
 def lemma_clean(data):
-    # Initialize spacy en model
+    # Initialize spacy en model TODO
     NLP = spacy.load('en_core_web_sm')
     # what goes out
     texts_out = []
