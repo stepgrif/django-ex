@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -89,6 +90,9 @@ def do_topic_extraction(text):
                 # extract topic
                 topic_words = []
                 for i, x in enumerate(vec_scores):
+                    # append probability
+                    topic_words.append(f'{round(x[np.argmax(x)] * 100, 2)}')
+                    # the words
                     topic_words.append(keywords[int(np.argmax(x))])
                 # store it
                 te = TopicExtractionJob()
@@ -102,7 +106,17 @@ def do_topic_extraction(text):
                 train_data.text = clean_data
                 train_data.save()
                 # done
-                return ' '.join([str(x) for x in topic_words[0][:model.model.components_.shape[0]]])
+                # get topic details
+                topics_details = {}
+                for t in model.topic_set.all():
+                    kw = [x.word for x in t.topicword_set.all()]
+                    topics_details[''.join(kw)] = t.topic
+                # keywords detected
+                kw = [x for x in topic_words[1][:model.model.components_.shape[0]]]
+                # result
+                result = {'Probability': f'{topic_words[0]}', 'Keywords': kw, 'Topic': topics_details[''.join(kw)]}
+                # as a json
+                return json.dumps(result)
             # no text
             logger.debug('No te')
             return 'Text is empty'
