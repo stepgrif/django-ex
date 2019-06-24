@@ -4,9 +4,11 @@ from django.db import models
 from picklefield import PickledObjectField
 
 
+# pages
 class PageView(models.Model):
     hostname = models.CharField(max_length=32)
     timestamp = models.DateTimeField(auto_now_add=True)
+
 
 class RunningTasks(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
