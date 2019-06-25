@@ -214,9 +214,11 @@ class TopicModeler:
                     topics_details = {}
                     for t in model.topic_set.all():
                         kw = [x.word for x in t.topicword_set.all()]
+                        kw.sort()
                         topics_details[''.join(kw)] = t.topic
                     # keywords detected
                     kw = [x for x in topic_words[1][:model.model.components_.shape[0]]]
+                    kw.sort()
                     # result
                     result = {'Probability': f'{topic_words[0]}', 'Keywords': kw, 'Topic': topics_details[''.join(kw)]}
                     # as a json
