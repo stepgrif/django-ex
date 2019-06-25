@@ -7,8 +7,9 @@ from topic_modeler.models import PageView
 from topic_modeler.models import TopicModel, TopicExtractionJob, Topic, TopicWord, TrainData, DataRaw, RunningTasks
 from topic_modeler.serializers import TopicModelSerializer, TopicSerializer, TopicWordSerializer, \
     TopicExtractionJobSerializer, TrainDataSerializer, DataRawSerializer, RunningTasksSerializer
-from topic_modeler.topic_modeler import schedule_train_topic_model, do_topic_extraction
+from topic_modeler.topic_modeler import TopicModeler
 
+modeler = TopicModeler()
 
 class RunningTasksViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = RunningTasks.objects.all().order_by('-id')
@@ -50,7 +51,7 @@ def train_model(request):
     number_of_topics = request.GET['number_of_topics']
     words_per_topic = request.GET['words_per_topic']
     # schedule job
-    message = schedule_train_topic_model(number_of_topics, words_per_topic)
+    message = modeler.schedule_train_topic_model(number_of_topics, words_per_topic)
     # done
     return HttpResponse(message)
 
@@ -59,7 +60,7 @@ def extract_topic(request):
     # extract parameters
     text = request.GET['text']
     # schedule job
-    message = do_topic_extraction(text)
+    message = modeler.do_topic_extraction(text)
     # done
     return HttpResponse(message)
 

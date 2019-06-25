@@ -17,8 +17,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 from topic_modeler import TRAIN_TASK
 from topic_modeler.models import RunningTasks, DataRaw, TrainData, TopicModel, Topic, TopicWord, TopicExtractionJob
 
-logger = logging.getLogger(__name__)
-
 # define bad symbols
 BAD_SYMBOLS_RE = re.compile(r'\W|\d|\.|x{2,}|,|\'')
 
@@ -26,120 +24,50 @@ BAD_SYMBOLS_RE = re.compile(r'\W|\d|\.|x{2,}|,|\'')
 ALLOWED_POSTAGS = ['NOUN', 'ADJ', 'VERB', 'ADV']
 
 
-# does schedule model training
-def schedule_train_topic_model(number_of_topics, words_per_topic):
-    try:
-        # what there
-        existing_task = RunningTasks.objects.all().filter(name=TRAIN_TASK)
-        # any exist
-        if len(existing_task) == 0:
-            # create new one
-            task = RunningTasks()
-            task.name = TRAIN_TASK
-            task.running = False
-            task.save()
-        # load task as one exist already
-        existing_task = RunningTasks.objects.all().filter(name=TRAIN_TASK).first()
-        # lock check
-        if not existing_task.running:
-            # lock the task
-            existing_task.running = True
-            existing_task.save()
-            # start background job now
-            scheduler = BackgroundScheduler()
-            scheduler.add_job(train_topic_model, 'date', args=[number_of_topics, words_per_topic],
-                              next_run_time=datetime.now())
-            scheduler.start()
-            # done
-            return 'Model training scheduled'
-        return 'Model training already running'
-    except Exception as e:
-        logger.debug(e)
-        # on any exception unlock
-        process_task(False)
+def extract_keywords(features, model, words_count):
+    # convert to numpy array
+    keywords = np.array(features)
+    # da keywords
+    topic_keywords = []
+    # iterate
+    for topic_weights in model.model.components_:
+        # find the best
+        top_keyword_locs = (-topic_weights).argsort()[:int(words_count)]
+        # store
+        topic_keywords.append(keywords.take(top_keyword_locs))
+    # done
+    return topic_keywords
 
 
-def do_topic_extraction(text):
-    try:
-        model = TopicModel.objects.filter(inuse=True).first()
-        if model:
-            if len(text) > 0:
-                # clean data
-                cd = basic_clean(text)
-                # lemma
-                cd_w = list(sent_to_words([cd]))
-                # lemma
-                clean_data = lemma_clean(cd_w)
-                # extract sparse matrix
-                vectoriser = model.features_extraction
-                # extact features
-                clean_data_vec = vectoriser.transform(clean_data)
-                # labels generated
-                clean_data_vec_features = vectoriser.get_feature_names()
-                # model
-                vec_scores = model.model.transform(clean_data_vec)
-                # keywords
-                keywords = extract_keywords(clean_data_vec_features, model, 10)
-                # extract topic
-                topic_words = []
-                for i, x in enumerate(vec_scores):
-                    # append probability
-                    topic_words.append(f'{round(x[np.argmax(x)] * 100, 2)}')
-                    # the words
-                    topic_words.append(keywords[int(np.argmax(x))])
-                # store it
-                te = TopicExtractionJob()
-                te.model = model
-                te.text = text
-                te.reference = uuid.uuid1()
-                te.processed = True
-                te.save()
-                # store train data
-                train_data = TrainData()
-                train_data.text = clean_data
-                train_data.save()
-                # done
-                # get topic details
-                topics_details = {}
-                for t in model.topic_set.all():
-                    kw = [x.word for x in t.topicword_set.all()]
-                    topics_details[''.join(kw)] = t.topic
-                # keywords detected
-                kw = [x for x in topic_words[1][:model.model.components_.shape[0]]]
-                # result
-                result = {'Probability': f'{topic_words[0]}', 'Keywords': kw, 'Topic': topics_details[''.join(kw)]}
-                # as a json
-                return json.dumps(result)
-            # no text
-            logger.debug('No te')
-            return 'Text is empty'
-        # no model
-        logger.debug('Model  not trained')
-        return 'Please train model'
-    except Exception as e:
-        logger.debug(e)
-        return f'Exception occur:{str(e)}'
+def train_store_model(number_of_topics, data, vectoriser):
+    # number of jobs
+    jobs_num = os.getenv('LDA_JOBS') if os.getenv('LDA_JOBS') else 1
+    # parallel train
+    with parallel_backend('threading', n_jobs=jobs_num):
+        # LDA train BoW
+        lda_vec = LatentDirichletAllocation(n_components=int(number_of_topics), learning_method='online',
+                                            n_jobs=jobs_num)
+        # train
+        lda_vec_trained = lda_vec.fit_transform(data)
+        # mark other as not use
+        for m in TopicModel.objects.all():
+            m.inuse = False
+            m.save()
+        # store new one
+        model_new = TopicModel()
+        model_new.perplexity = lda_vec.perplexity(data)
+        model_new.decomposition = lda_vec
+        model_new.features_extraction = vectoriser
+        model_new.inuse = True
+        model_new.model = lda_vec
+        model_new.fitted_model = lda_vec_trained
+        model_new.save()
+        # reload for an id
+        model_new.refresh_from_db()
+        # done
+        return model_new
 
 
-# does model training
-def train_topic_model(number_of_topics, words_per_topic):
-    try:
-        # do the raw data
-        clean_data = process_raw_data()
-        # do the features
-        clean_lemma_data_vect, clean_lemma_data_vect_features, vectoriser = extract_features(clean_data)
-        # do the train
-        model_new = train_store_model(number_of_topics, clean_lemma_data_vect, vectoriser)
-        # do the topics and words
-        process_topics_words(model_new, clean_lemma_data_vect_features, words_per_topic)
-    except Exception as e:
-        logger.debug(e)
-    finally:
-        # unlock after done
-        process_task(False)
-
-
-# does topics and words
 def process_topics_words(model_new, features, words_count):
     # convert to numpy array
     keywords = np.array(features)
@@ -177,67 +105,6 @@ def process_topics_words(model_new, features, words_count):
             w.save()
 
 
-# does model training
-def train_store_model(number_of_topics, data, vectoriser):
-    # number of jobs
-    jobs_num = os.getenv('LDA_JOBS') if os.getenv('LDA_JOBS') else 1
-    # parallel train
-    with parallel_backend('threading', n_jobs=jobs_num):
-        # LDA train BoW
-        lda_vec = LatentDirichletAllocation(n_components=int(number_of_topics), learning_method='online',
-                                            n_jobs=jobs_num)
-        # train
-        lda_vec_trained = lda_vec.fit_transform(data)
-        # mark other as not use
-        for m in TopicModel.objects.all():
-            m.inuse = False
-            m.save()
-        # store new one
-        model_new = TopicModel()
-        model_new.perplexity = lda_vec.perplexity(data)
-        model_new.decomposition = lda_vec
-        model_new.features_extraction = vectoriser
-        model_new.inuse = True
-        model_new.model = lda_vec
-        model_new.fitted_model = lda_vec_trained
-        model_new.save()
-        # reload for an id
-        model_new.refresh_from_db()
-        # done
-        return model_new
-
-
-# does process raw data
-def process_raw_data():
-    # for further use
-    data_clean = []
-    # get all new raw data
-    for rd in DataRaw.objects.all():
-        # stop words
-        cd = basic_clean(rd.text)
-        # store
-        data_clean.append(cd)
-    # split words
-    cd_w = list(sent_to_words(data_clean))
-    # lemma
-    clean_data = lemma_clean(cd_w)
-    # store as clean
-    for s in clean_data:
-        train_data = TrainData()
-        train_data.text = s
-        train_data.save()
-    # remove all process data
-    DataRaw.objects.all().delete()
-    # all clean data
-    all_clean = []
-    # get all old train data
-    for td in TrainData.objects.all():
-        all_clean.append(td.text)
-    # done
-    return all_clean
-
-
-# does feature extraction
 def extract_features(clean_lemma_data):
     if len(clean_lemma_data) > 0:
         # create BoW
@@ -250,7 +117,6 @@ def extract_features(clean_lemma_data):
         return clean_lemma_data_vect, clean_lemma_data_vect_features, vectorised
 
 
-# does updating train task running state
 def process_task(running):
     # load task
     existing_task = RunningTasks.objects.all().filter(name=TRAIN_TASK).first()
@@ -260,54 +126,178 @@ def process_task(running):
     existing_task.save()
 
 
-# does basic clean
-def basic_clean(data):
-    # define stop words TODO
-    stop = set(stopwords.words('english'))
-    # lower case
-    text = str.lower(data)
-    # remove bad symbols
-    text = BAD_SYMBOLS_RE.sub(' ', text)
-    # remove stop words and words with length < 2
-    text = ' '.join(w for w in text.split() if w not in stop and len(w) > 2)
-    # done
-    return text
-
-
-# does lemma
-def lemma_clean(data):
-    # Initialize spacy en model TODO
-    nlp = spacy.load('en_core_web_sm')
-    # what goes out
-    texts_out = []
-    # iterate
-    for sent in data:
-        # doc
-        doc = nlp(" ".join(sent))
-        # process
-        texts_out.append(" ".join(
-            [token.lemma_ if token.lemma_ not in ['-PRON-'] else '' for token in doc if token.pos_ in ALLOWED_POSTAGS]))
-    # done
-    return texts_out
-
-
-# tokenize each sentence into a list of words
 def sent_to_words(sentences):
     for sentence in sentences:
         yield (gensim.utils.simple_preprocess(str(sentence), deacc=True))
 
 
-# extract keywords
-def extract_keywords(features, model, words_count):
-    # convert to numpy array
-    keywords = np.array(features)
-    # da keywords
-    topic_keywords = []
-    # iterate
-    for topic_weights in model.model.components_:
-        # find the best
-        top_keyword_locs = (-topic_weights).argsort()[:int(words_count)]
-        # store
-        topic_keywords.append(keywords.take(top_keyword_locs))
-    # done
-    return topic_keywords
+class TopicModeler:
+
+    def __init__(self):
+        self.nlp = spacy.load('en_core_web_sm')
+        self.stop = set(stopwords.words('english'))
+        self.logger = logging.getLogger(__name__)
+
+    # does schedule model training
+    def schedule_train_topic_model(self, number_of_topics, words_per_topic):
+        try:
+            # what there
+            existing_task = RunningTasks.objects.all().filter(name=TRAIN_TASK)
+            # any exist
+            if len(existing_task) == 0:
+                # create new one
+                task = RunningTasks()
+                task.name = TRAIN_TASK
+                task.running = False
+                task.save()
+            # load task as one exist already
+            existing_task = RunningTasks.objects.all().filter(name=TRAIN_TASK).first()
+            # lock check
+            if not existing_task.running:
+                # lock the task
+                existing_task.running = True
+                existing_task.save()
+                # start background job now
+                scheduler = BackgroundScheduler()
+                scheduler.add_job(self.train_topic_model, 'date', args=[number_of_topics, words_per_topic],
+                                  next_run_time=datetime.now())
+                scheduler.start()
+                # done
+                return 'Model training scheduled'
+            return 'Model training already running'
+        except Exception as e:
+            self.logger.debug(e)
+            # on any exception unlock
+            process_task(False)
+
+    def do_topic_extraction(self, text):
+        try:
+            model = TopicModel.objects.filter(inuse=True).first()
+            if model:
+                if len(text) > 0:
+                    # clean data
+                    cd = self.basic_clean(text)
+                    # lemma
+                    cd_w = list(sent_to_words([cd]))
+                    # lemma
+                    clean_data = self.lemma_clean(cd_w)
+                    # extract sparse matrix
+                    vectoriser = model.features_extraction
+                    # extact features
+                    clean_data_vec = vectoriser.transform(clean_data)
+                    # labels generated
+                    clean_data_vec_features = vectoriser.get_feature_names()
+                    # model
+                    vec_scores = model.model.transform(clean_data_vec)
+                    # keywords
+                    keywords = extract_keywords(clean_data_vec_features, model, 10)
+                    # extract topic
+                    topic_words = []
+                    for i, x in enumerate(vec_scores):
+                        # append probability
+                        topic_words.append(f'{round(x[np.argmax(x)] * 100, 2)}')
+                        # the words
+                        topic_words.append(keywords[int(np.argmax(x))])
+                    # store it
+                    te = TopicExtractionJob()
+                    te.model = model
+                    te.text = text
+                    te.reference = uuid.uuid1()
+                    te.processed = True
+                    te.save()
+                    # store train data
+                    train_data = TrainData()
+                    train_data.text = clean_data
+                    train_data.save()
+                    # done
+                    # get topic details
+                    topics_details = {}
+                    for t in model.topic_set.all():
+                        kw = [x.word for x in t.topicword_set.all()]
+                        topics_details[''.join(kw)] = t.topic
+                    # keywords detected
+                    kw = [x for x in topic_words[1][:model.model.components_.shape[0]]]
+                    # result
+                    result = {'Probability': f'{topic_words[0]}', 'Keywords': kw, 'Topic': topics_details[''.join(kw)]}
+                    # as a json
+                    return json.dumps(result)
+                # no text
+                self.logger.debug('No te')
+                return 'Text is empty'
+            # no model
+            self.logger.debug('Model  not trained')
+            return 'Please train model'
+        except Exception as e:
+            self.logger.debug(e)
+            return f'Exception occur:{str(e)}'
+
+    def train_topic_model(self, number_of_topics, words_per_topic):
+        try:
+            # do the raw data
+            clean_data = self.process_raw_data()
+            # do the features
+            clean_lemma_data_vect, clean_lemma_data_vect_features, vectoriser = extract_features(clean_data)
+            # do the train
+            model_new = train_store_model(number_of_topics, clean_lemma_data_vect, vectoriser)
+            # do the topics and words
+            process_topics_words(model_new, clean_lemma_data_vect_features, words_per_topic)
+        except Exception as e:
+            self.logger.debug(e)
+        finally:
+            # unlock after done
+            process_task(False)
+
+    # does process raw data
+    def process_raw_data(self):
+        # for further use
+        data_clean = []
+        # get all new raw data
+        for rd in DataRaw.objects.all():
+            # stop words
+            cd = self.basic_clean(rd.text)
+            # store
+            data_clean.append(cd)
+        # split words
+        cd_w = list(sent_to_words(data_clean))
+        # lemma
+        clean_data = self.lemma_clean(cd_w)
+        # store as clean
+        for s in clean_data:
+            train_data = TrainData()
+            train_data.text = s
+            train_data.save()
+        # remove all process data
+        DataRaw.objects.all().delete()
+        # all clean data
+        all_clean = []
+        # get all old train data
+        for td in TrainData.objects.all():
+            all_clean.append(td.text)
+        # done
+        return all_clean
+
+    # does basic clean
+    def basic_clean(self, data):
+        # lower case
+        text = str.lower(data)
+        # remove bad symbols
+        text = BAD_SYMBOLS_RE.sub(' ', text)
+        # remove stop words and words with length < 2
+        text = ' '.join(w for w in text.split() if w not in self.stop and len(w) > 2)
+        # done
+        return text
+
+    # does lemma
+    def lemma_clean(self, data):
+        # what goes out
+        texts_out = []
+        # iterate
+        for sent in data:
+            # doc
+            doc = self.nlp(" ".join(sent))
+            # process
+            texts_out.append(" ".join(
+                [token.lemma_ if token.lemma_ not in ['-PRON-'] else '' for token in doc if
+                 token.pos_ in ALLOWED_POSTAGS]))
+        # done
+        return texts_out
