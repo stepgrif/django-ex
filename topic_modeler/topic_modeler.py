@@ -53,7 +53,8 @@ def schedule_train_topic_model(number_of_topics, words_per_topic):
             # done
             return 'Model training scheduled'
         return 'Model training already running'
-    except:
+    except Exception as e:
+        logger.debug(e)
         # on any exception unlock
         process_task(False)
 
@@ -262,13 +263,13 @@ def process_task(running):
 # does basic clean
 def basic_clean(data):
     # define stop words TODO
-    STOPWORDS = set(stopwords.words('english'))
+    stop = set(stopwords.words('english'))
     # lower case
     text = str.lower(data)
     # remove bad symbols
     text = BAD_SYMBOLS_RE.sub(' ', text)
     # remove stop words and words with length < 2
-    text = ' '.join(w for w in text.split() if w not in STOPWORDS and len(w) > 2)
+    text = ' '.join(w for w in text.split() if w not in stop and len(w) > 2)
     # done
     return text
 
@@ -276,13 +277,13 @@ def basic_clean(data):
 # does lemma
 def lemma_clean(data):
     # Initialize spacy en model TODO
-    NLP = spacy.load('en_core_web_sm')
+    nlp = spacy.load('en_core_web_sm')
     # what goes out
     texts_out = []
     # iterate
     for sent in data:
         # doc
-        doc = NLP(" ".join(sent))
+        doc = nlp(" ".join(sent))
         # process
         texts_out.append(" ".join(
             [token.lemma_ if token.lemma_ not in ['-PRON-'] else '' for token in doc if token.pos_ in ALLOWED_POSTAGS]))

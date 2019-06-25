@@ -3,8 +3,8 @@ from django.conf.urls import include, url
 from django.contrib import admin
 from rest_framework import routers
 
-from topic_modeler.views import index, health, train_model, extract_topic, TopicModelViewSet, TopicExtractionJobViewSet, \
-    TopicWordViewSet, TopicViewSet, TrainDataViewSet, DataRawViewSet, RunningTasksViewSet
+from topic_modeler.views import index, health, train_model, extract_topic, TopicModelViewSet, \
+    TopicExtractionJobViewSet, TopicWordViewSet, TopicViewSet, TrainDataViewSet, DataRawViewSet, RunningTasksViewSet
 
 router = routers.DefaultRouter()
 router.register(r'models', TopicModelViewSet)
