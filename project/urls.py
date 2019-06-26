@@ -4,7 +4,8 @@ from django.contrib import admin
 from rest_framework import routers
 
 from topic_modeler.views import index, health, train_model, extract_topic, TopicModelViewSet, \
-    TopicExtractionJobViewSet, TopicWordViewSet, TopicViewSet, TrainDataViewSet, DataRawViewSet, RunningTasksViewSet
+    TopicExtractionJobViewSet, TopicWordViewSet, TopicViewSet, TrainDataViewSet, DataRawViewSet, RunningTasksViewSet, \
+    upload_file
 
 router = routers.DefaultRouter()
 router.register(r'models', TopicModelViewSet)
@@ -25,7 +26,8 @@ urlpatterns = [
     url(r'^rest_api/', include(router.urls)),
     # functionality
     url(r'^train_model/', train_model),
-    url(r'^extract_topic/', extract_topic)
+    url(r'^extract_topic/', extract_topic),
+    url(r'^upload_file/', upload_file)
 ]
 
 if settings.DEBUG:

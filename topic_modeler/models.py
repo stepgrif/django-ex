@@ -46,6 +46,7 @@ class Topic(models.Model):
     model = models.ForeignKey(TopicModel, on_delete=models.CASCADE)
     created_date = models.DateTimeField(auto_now_add=True)
     topic = models.CharField(max_length=50)
+    description = models.CharField(max_length=500, default=None, blank=True, null=True)
     inuse = models.BooleanField()
 
 

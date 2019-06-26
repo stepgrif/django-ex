@@ -7,6 +7,7 @@ from datetime import datetime
 
 import gensim
 import numpy as np
+import pandas as pd
 import spacy
 from apscheduler.schedulers.background import BackgroundScheduler
 from joblib import parallel_backend
@@ -22,6 +23,45 @@ BAD_SYMBOLS_RE = re.compile(r'\W|\d|\.|x{2,}|,|\'')
 
 # keeping only Noun, Adj, Verb, Adverb
 ALLOWED_POSTAGS = ['NOUN', 'ADJ', 'VERB', 'ADV']
+
+
+def handle_file_upload(file):
+    # carve filename
+    file_name = os.path.join(os.getcwd(), 'uploads', str(uuid.uuid1()))
+    # dump data
+    with open(file_name, 'wb+') as destination:
+        for chunk in file.chunks():
+            destination.write(chunk)
+    # start background job now
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(process_rw_data, 'date', args=[file_name], next_run_time=datetime.now())
+    scheduler.start()
+    # done
+    return 'File process scheduled'
+
+
+def process_rw_data(file_name):
+    # load file
+    file = pd.read_csv(file_name)
+    # iterate
+    for f in file['Data']:
+        # any data
+        if f is not np.nan and len(f) > 0:
+            # create
+            rd = DataRaw(text=f)
+            # save
+            rd.save()
+    # delete file
+    os.remove(file_name)
+
+
+def update_topic_description(topic_uuid, description):
+    topic = Topic.objects.filter(uuid == topic_uuid).first()
+    if topic:
+        topic.description = description
+        topic.save()
+        return 'Topic updated'
+    return 'No such topic exist'
 
 
 def extract_keywords(features, model, words_count):

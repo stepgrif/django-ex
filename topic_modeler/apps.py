@@ -10,5 +10,5 @@ class TopicModelerConfig(AppConfig):
     name = 'topic_modeler'
 
     def ready(self):
-        logger.debug('Loaded stopwords')
+        logger.debug('Loading stopwords')
         nltk.download('stopwords', quiet=True)
